@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Queue v1.3.1 - Full Access</title>
+    <title>Task Queue v1.4 - Secure & Fluid</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -15,33 +15,51 @@
         }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-dark); color: #eee; margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
+        /* Lock Screen */
         #lock-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
         .id-badge { background: #2a2a2a; padding: 20px; border-radius: 10px; border: 1px dashed #555; font-family: monospace; color: #3498db; font-size: 1.2rem; margin: 20px 0; user-select: all; }
 
-        #sidebar { width: var(--sidebar-width); background: var(--sidebar-bg); padding: 25px; display: flex; flex-direction: column; gap: 12px; z-index: 20; box-shadow: 4px 0 15px rgba(0,0,0,0.5); overflow-y: auto; transition: margin-left 0.3s ease; position: relative; }
+        /* Sidebar (PC & Mobile Logic) */
+        #sidebar { 
+            width: var(--sidebar-width); background: var(--sidebar-bg); padding: 25px; 
+            display: flex; flex-direction: column; gap: 12px; z-index: 40; 
+            box-shadow: 4px 0 15px rgba(0,0,0,0.5); overflow-y: auto; 
+            transition: margin-left 0.3s ease, transform 0.3s ease; position: relative; 
+        }
         #sidebar.collapsed { margin-left: calc(var(--sidebar-width) * -1); }
 
-        #toggle-pc { position: fixed; left: var(--sidebar-width); top: 50%; transform: translateY(-50%); background: var(--sidebar-bg); border: 1px solid #333; border-left: none; color: white; padding: 15px 8px; cursor: pointer; border-radius: 0 8px 8px 0; z-index: 21; transition: left 0.3s ease; }
+        #toggle-pc { position: fixed; left: var(--sidebar-width); top: 50%; transform: translateY(-50%); background: var(--sidebar-bg); border: 1px solid #333; border-left: none; color: white; padding: 15px 8px; cursor: pointer; border-radius: 0 8px 8px 0; z-index: 41; transition: left 0.3s ease; }
         .collapsed + #toggle-pc { left: 0; }
 
-        .top-bar { display: flex; align-items: center; gap: 15px; margin-bottom: 25px; }
-        #searchBar { flex-grow: 1; background: #2a2a2a; border: 1px solid #444; padding: 10px; border-radius: 6px; color: white; }
+        /* Unified Top Bar */
+        .top-bar { 
+            display: flex; align-items: center; gap: 12px; background: #1e1e1e; padding: 10px 15px; 
+            border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 30; height: 60px; box-sizing: border-box;
+        }
+        .search-wrapper { position: relative; flex-grow: 1; display: flex; align-items: center; }
+        #searchBar { width: 100%; background: #2a2a2a; border: 1px solid #444; padding: 8px 35px 8px 15px; border-radius: 20px; color: white; font-size: 0.95rem; outline: none; }
+        #clearSearch { position: absolute; right: 10px; background: none; border: none; color: #666; cursor: pointer; font-size: 1.2rem; display: none; }
 
-        #main-display { flex-grow: 1; padding: 30px; overflow-y: auto; }
-        #toggle-mobile { display: none; width: 100%; background: #222; border: none; color: #aaa; padding: 12px; cursor: pointer; font-size: 1.1rem; border-bottom: 1px solid #333; }
+        .icon-btn { background: #3498db; border: none; color: white; width: 38px; height: 38px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 1.2rem; flex-shrink: 0; transition: transform 0.2s; }
+        .icon-btn:active { transform: scale(0.9); }
+
+        #main-display { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; }
+        .content-area { padding: 20px; }
 
         @media (max-width: 768px) {
-            body { flex-direction: column; overflow-y: auto; }
-            #sidebar { width: 100%; height: auto; margin-left: 0; padding: 15px; display: block; }
-            #sidebar.collapsed { display: none; }
+            #sidebar { 
+                position: fixed; top: 60px; left: 0; width: 100%; height: auto; max-height: 85vh; 
+                margin-left: 0; transform: translateY(-120%); box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            }
+            #sidebar.expanded { transform: translateY(0); }
             #toggle-pc { display: none; }
-            #toggle-mobile { display: block; }
         }
 
-        .queue-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-        .card { padding: 20px; border-radius: 12px; text-align: center; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.4); display: flex; flex-direction: column; justify-content: center; min-height: 180px; font-size: var(--card-font-size); }
-        .card h3 { margin: 0; font-size: 2.2em; word-break: break-word; }
-        .timer { font-size: 2.2em; font-weight: 800; font-family: monospace; margin-top: 10px; }
+        /* Cards & Grid */
+        .queue-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
+        .card { padding: 20px; border-radius: 12px; text-align: center; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.4); display: flex; flex-direction: column; justify-content: center; min-height: 160px; font-size: var(--card-font-size); }
+        .card h3 { margin: 0; font-size: 1.8em; word-break: break-word; }
+        .timer { font-size: 1.8em; font-weight: 800; font-family: monospace; margin-top: 10px; }
 
         .status-green { background: var(--card-green); color: white; }
         .status-yellow { background: var(--card-yellow); color: #111; }
@@ -49,64 +67,62 @@
         .status-critical { background: var(--card-critical); color: white; animation: flash 1s infinite; }
         @keyframes flash { 0%, 100% { background: var(--card-critical); } 50% { background: #ff0000; } }
 
-        label { font-size: 0.75rem; color: #aaa; text-transform: uppercase; font-weight: bold; margin-bottom: -5px; }
+        label { font-size: 0.75rem; color: #aaa; text-transform: uppercase; font-weight: bold; margin-bottom: -5px; margin-top: 5px; }
         input, textarea, button { padding: 12px; border-radius: 6px; border: 1px solid #333; background: #2a2a2a; color: white; font-size: 1rem; }
-        button.primary { background: #3498db; border: none; font-weight: bold; cursor: pointer; }
+        button.primary { background: #3498db; border: none; font-weight: bold; cursor: pointer; margin-top: 5px; }
         
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; justify-content: center; align-items: center; }
-        .modal-content { background: #fff; color: #222; padding: 30px; border-radius: 15px; width: 90%; max-width: 450px; display: flex; flex-direction: column; gap: 15px; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: #fff; color: #222; padding: 25px; border-radius: 15px; width: 90%; max-width: 450px; display: flex; flex-direction: column; gap: 12px; max-height: 90vh; overflow-y: auto; }
     </style>
 </head>
 <body>
 
     <div id="lock-screen" style="display: none;">
         <h1>Device Unauthorized</h1>
-        <p>Please provide this Device ID to the administrator for access:</p>
-        <div id="display-id" class="id-badge">GENERATING...</div>
-        <button onclick="location.reload()" style="background: #333; border: 1px solid #444; padding:15px; cursor:pointer">Check Approval Status</button>
+        <p>Provide this Device ID for access:</p>
+        <div id="display-id" class="id-badge">...</div>
+        <button onclick="location.reload()" style="background: #333; cursor:pointer">Check Status</button>
     </div>
 
-    <button id="toggle-mobile" onclick="toggleSidebar()">Add New Task ▾</button>
-
     <div id="sidebar">
-        <h2 style="margin:0 0 10px 0">New Task</h2>
+        <h2 style="margin:0">New Task</h2>
         <label>Task Name</label><input type="text" id="custName">
         <label>Subject</label><input type="text" id="jobSubject">
         <label>Due Date & Time</label>
         <div style="display:flex; gap:5px"><input type="date" id="dueDate" style="flex:2"><input type="time" id="dueTime" style="flex:1"></div>
         <label>Notes</label><textarea id="jobNotes" rows="4"></textarea>
         <button class="primary" onclick="addJob()">Add to Queue</button>
-        <button onclick="toggleSidebar()" style="background:none; border:none; color:#555; cursor:pointer; text-decoration:underline; margin-top:10px">Collapse Sidebar</button>
     </div>
 
     <button id="toggle-pc" onclick="toggleSidebar()">◀</button>
 
     <div id="main-display">
         <div class="top-bar">
-            <input type="text" id="searchBar" placeholder="Search tasks..." oninput="renderQueue()">
+            <div class="search-wrapper">
+                <input type="text" id="searchBar" placeholder="Search tasks..." oninput="handleSearchInput()">
+                <button id="clearSearch" onclick="clearSearch()">✕</button>
+            </div>
+            <button class="icon-btn" id="mobileAddBtn" onclick="toggleSidebar()">＋</button>
             <button onclick="openSettings()" style="background:none; border:none; cursor:pointer; font-size:1.5rem; padding:0">⚙️</button>
         </div>
-        <div id="queue-container" class="queue-grid"></div>
+
+        <div class="content-area">
+            <div id="queue-container" class="queue-grid"></div>
+        </div>
     </div>
 
     <div id="settings-modal" class="modal" onclick="closeSettings()">
         <div class="modal-content" onclick="event.stopPropagation()">
-            <h2 style="margin:0; color:#222">Global Settings</h2>
-            <label style="color:#666">Card Font Size</label>
-            <input type="range" id="set-font" min="0.5" max="2" step="0.1" oninput="settings.fontSize = this.value; applySettings();">
+            <h2 style="margin:0">Settings</h2>
+            <label style="color:#666">Font Size</label>
+            <input type="range" id="set-font" min="0.5" max="1.5" step="0.1" oninput="settings.fontSize = this.value; applySettings();">
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
                 <div><label style="color:#666">Normal</label><input type="color" id="col-green" style="width:100%"></div>
                 <div><label style="color:#666">Medium</label><input type="color" id="col-yellow" style="width:100%"></div>
                 <div><label style="color:#666">Urgent</label><input type="color" id="col-red" style="width:100%"></div>
                 <div><label style="color:#666">Critical</label><input type="color" id="col-critical" style="width:100%"></div>
             </div>
-            <h3 style="margin:10px 0 0; color:#444">Thresholds (Mins)</h3>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; align-items:center">
-                <label style="color:#555">Medium:</label><input type="number" id="t-medium" style="background:#eee; color:#222">
-                <label style="color:#555">Urgent:</label><input type="number" id="t-urgent" style="background:#eee; color:#222">
-                <label style="color:#555">Critical:</label><input type="number" id="t-critical" style="background:#eee; color:#222">
-            </div>
-            <button class="primary" onclick="saveSettings()">Save for All Devices</button>
+            <button class="primary" onclick="saveSettings()">Save Configuration</button>
         </div>
     </div>
 
@@ -114,25 +130,22 @@
         <div class="modal-content" onclick="event.stopPropagation()">
             <div id="view-mode">
                 <h1 id="view-name" style="margin:0"></h1>
-                <h3 id="view-subject" style="color:#666; margin-top:5px"></h3>
-                <p id="view-notes" style="background:#f9f9f9; padding:15px; border-radius:8px; min-height:80px; white-space: pre-wrap; color:#333"></p>
+                <h3 id="view-subject" style="color:#666; margin:5px 0"></h3>
+                <p id="view-notes" style="background:#f4f4f4; padding:15px; border-radius:8px; white-space: pre-wrap;"></p>
                 <div style="display:flex; gap:10px">
-                    <button style="background:#f39c12; flex:1; border:none; color:white; font-weight:bold; cursor:pointer; padding:12px; border-radius:6px" onclick="toggleEdit(true)">Edit</button>
-                    <button style="background:#e74c3c; flex:1; border:none; color:white; font-weight:bold; cursor:pointer; padding:12px; border-radius:6px" onclick="deleteJob()">Complete</button>
+                    <button style="background:#f39c12; flex:1" onclick="toggleEdit(true)">Edit</button>
+                    <button style="background:#e74c3c; flex:1" onclick="deleteJob()">Complete</button>
                 </div>
             </div>
-            <div id="edit-mode" style="display:none; flex-direction:column; gap:10px;">
-                <h2 style="margin:0; color:#222">Edit Task</h2>
-                <input type="text" id="edit-name" style="background:#eee; color:#222">
-                <input type="text" id="edit-subject" style="background:#eee; color:#222">
-                <div style="display:flex; gap:5px"><input type="date" id="edit-date" style="background:#eee; color:#222; flex:2"><input type="time" id="edit-time" style="background:#eee; color:#222; flex:1"></div>
-                <textarea id="edit-notes" rows="4" style="background:#eee; color:#222"></textarea>
-                <div style="display:flex; gap:10px">
-                    <button class="primary" style="flex:1" onclick="updateJob()">Save</button>
-                    <button style="background:#7f8c8d; flex:1; border:none; color:white; font-weight:bold; cursor:pointer; padding:12px; border-radius:6px" onclick="toggleEdit(false)">Cancel</button>
-                </div>
+            <div id="edit-mode" style="display:none; flex-direction:column; gap:8px;">
+                <h2>Edit Task</h2>
+                <input type="text" id="edit-name">
+                <input type="text" id="edit-subject">
+                <div style="display:flex; gap:5px"><input type="date" id="edit-date" style="flex:2"><input type="time" id="edit-time" style="flex:1"></div>
+                <textarea id="edit-notes" rows="4"></textarea>
+                <button class="primary" onclick="updateJob()">Update Task</button>
             </div>
-            <button onclick="closeModal()" style="margin-top:10px; background:none; border:none; color:#999; cursor:pointer; text-decoration:underline">Close</button>
+            <button onclick="closeModal()" style="margin-top:10px; background:none; border:none; color:#999; text-decoration:underline">Close</button>
         </div>
     </div>
 
@@ -141,11 +154,9 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhuem53YmtsZm9pb2xwdHZ2eXBmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3ODQzNzUsImV4cCI6MjA4NDM2MDM3NX0.dsgpuQB71AkcHKKBTzcYiwxcVLZWdEVd9vcpkVEtWME';
         const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        let queue = [];
-        let activeJobId = null;
+        let queue = [], activeJobId = null;
         let settings = { fontSize: 1, colors: {}, thresholds: { medium: 60, urgent: 30, critical: 15 } };
 
-        // 1. DEVICE ID LOGIC
         function getDeviceId() {
             let id = localStorage.getItem('task_queue_device_id');
             if (!id) {
@@ -155,26 +166,14 @@
             return id;
         }
 
-        async function checkApproval() {
+        async function init() {
             const deviceId = getDeviceId();
             document.getElementById('display-id').innerText = deviceId;
-            const { data, error } = await sb.from('approved_devices').select('device_id').eq('device_id', deviceId).single();
-            if (error || !data) {
-                document.getElementById('lock-screen').style.display = 'flex';
-                return false;
-            }
-            return true;
-        }
+            const { data } = await sb.from('approved_devices').select('device_id').eq('device_id', deviceId).single();
+            if (!data) return document.getElementById('lock-screen').style.display = 'flex';
 
-        // 2. MAIN APP FUNCTIONS
-        async function init() {
-            if (!(await checkApproval())) return;
-
-            await fetchSettings();
-            await fetchTasks();
-            
-            sb.channel('sync').on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, fetchTasks).on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, fetchSettings).subscribe();
-            
+            await fetchSettings(); await fetchTasks();
+            sb.channel('sync').on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, fetchTasks).subscribe();
             setInterval(renderQueue, 1000);
             document.getElementById('dueDate').valueAsDate = new Date();
         }
@@ -186,7 +185,6 @@
 
         async function saveSettings() {
             settings.colors = { green: document.getElementById('col-green').value, yellow: document.getElementById('col-yellow').value, red: document.getElementById('col-red').value, critical: document.getElementById('col-critical').value };
-            settings.thresholds = { medium: parseInt(document.getElementById('t-medium').value), urgent: parseInt(document.getElementById('t-urgent').value), critical: parseInt(document.getElementById('t-critical').value) };
             await sb.from('settings').update({ data: settings }).eq('id', 1);
             closeSettings();
         }
@@ -202,40 +200,35 @@
 
         async function fetchTasks() {
             const { data } = await sb.from('tasks').select('*');
-            queue = data || [];
+            queue = data || []; renderQueue();
+        }
+
+        function handleSearchInput() {
+            const val = document.getElementById('searchBar').value;
+            document.getElementById('clearSearch').style.display = val ? 'block' : 'none';
             renderQueue();
         }
 
-        async function addJob() {
-            const d = document.getElementById('dueDate').value, t = document.getElementById('dueTime').value;
-            if(!d || !t) return alert("Date/Time required");
-            await sb.from('tasks').insert([{ name: document.getElementById('custName').value, subject: document.getElementById('jobSubject').value, notes: document.getElementById('jobNotes').value, due_timestamp: new Date(`${d}T${t}`).getTime() }]);
-            ['custName', 'jobSubject', 'jobNotes'].forEach(id => document.getElementById(id).value = '');
-            if(window.innerWidth <= 768) toggleSidebar();
+        function clearSearch() {
+            document.getElementById('searchBar').value = '';
+            handleSearchInput();
         }
-
-        async function updateJob() {
-            const d = document.getElementById('edit-date').value, t = document.getElementById('edit-time').value;
-            await sb.from('tasks').update({ name: document.getElementById('edit-name').value, subject: document.getElementById('edit-subject').value, notes: document.getElementById('edit-notes').value, due_timestamp: new Date(`${d}T${t}`).getTime() }).eq('id', activeJobId);
-            closeModal();
-        }
-
-        async function deleteJob() { await sb.from('tasks').delete().eq('id', activeJobId); closeModal(); }
 
         function renderQueue() {
             const container = document.getElementById('queue-container');
-            const query = (document.getElementById('searchBar').value || "").toLowerCase();
+            const query = document.getElementById('searchBar').value.toLowerCase();
             const filtered = queue.filter(j => (j.name||"").toLowerCase().includes(query) || (j.subject||"").toLowerCase().includes(query));
             const sorted = filtered.sort((a, b) => a.due_timestamp - b.due_timestamp);
             
-            container.innerHTML = ''; 
-            sorted.forEach((job) => {
+            container.innerHTML = '';
+            sorted.forEach(job => {
                 const diff = job.due_timestamp - Date.now();
                 const mins = diff / 60000;
                 let s = "status-green";
                 if(mins < settings.thresholds.critical) s = "status-critical";
                 else if(mins < settings.thresholds.urgent) s = "status-red";
                 else if(mins < settings.thresholds.medium) s = "status-yellow";
+                
                 const card = document.createElement('div');
                 card.className = `card ${s}`;
                 card.onclick = () => openModal(job.id);
@@ -246,52 +239,56 @@
 
         function formatCountdown(ms) {
             const abs = Math.abs(ms);
-            const d = Math.floor(abs / 86400000), h = Math.floor((abs % 86400000) / 3600000), m = Math.floor((abs % 3600000) / 60000), s = Math.floor((abs % 60000) / 1000);
-            let p = []; if(d > 0) p.push(`${d}D`); if(h > 0 || d > 0) p.push(`${h}H`); p.push(`${m}M`, `${s}S`);
-            return (ms < 0 ? '- ' : '') + p.join(' ');
+            const d = Math.floor(abs/86400000), h = Math.floor((abs%86400000)/3600000), m = Math.floor((abs%3600000)/60000), s = Math.floor((abs%60000)/1000);
+            return (ms < 0 ? '- ' : '') + (d > 0 ? d+'D ' : '') + (h > 0 ? h+'H ' : '') + m+'M '+s+'S';
+        }
+
+        function toggleSidebar() {
+            const sb = document.getElementById('sidebar');
+            const btnPC = document.getElementById('toggle-pc');
+            const btnMob = document.getElementById('mobileAddBtn');
+            if (window.innerWidth <= 768) {
+                const isExp = sb.classList.toggle('expanded');
+                btnMob.innerText = isExp ? '✕' : '＋';
+                btnMob.style.background = isExp ? '#e74c3c' : '#3498db';
+            } else {
+                const isCol = sb.classList.toggle('collapsed');
+                btnPC.innerText = isCol ? '▶' : '◀';
+            }
+        }
+
+        async function addJob() {
+            const d = document.getElementById('dueDate').value, t = document.getElementById('dueTime').value;
+            if(!d || !t) return alert("Required: Date & Time");
+            await sb.from('tasks').insert([{ name: document.getElementById('custName').value, subject: document.getElementById('jobSubject').value, notes: document.getElementById('jobNotes').value, due_timestamp: new Date(`${d}T${t}`).getTime() }]);
+            ['custName','jobSubject','jobNotes'].forEach(id => document.getElementById(id).value = '');
+            if(window.innerWidth <= 768) toggleSidebar();
         }
 
         function openModal(id) {
-            activeJobId = id;
-            const job = queue.find(j => j.id === id);
+            activeJobId = id; const job = queue.find(j => j.id === id);
             document.getElementById('view-name').innerText = job.name;
             document.getElementById('view-subject').innerText = job.subject;
             document.getElementById('view-notes').innerText = job.notes || "";
             const dt = new Date(job.due_timestamp);
             document.getElementById('edit-name').value = job.name;
-            document.getElementById('edit-subject').value = job.subject;
-            document.getElementById('edit-notes').value = job.notes;
             document.getElementById('edit-date').value = dt.toISOString().split('T')[0];
             document.getElementById('edit-time').value = dt.toTimeString().slice(0,5);
-            toggleEdit(false);
-            document.getElementById('details-modal').style.display = "flex";
+            toggleEdit(false); document.getElementById('details-modal').style.display = "flex";
         }
 
-        function toggleSidebar() {
-            const sbElem = document.getElementById('sidebar');
-            const btn = document.getElementById('toggle-pc');
-            const isCol = sbElem.classList.toggle('collapsed');
-            btn.innerText = isCol ? '▶' : '◀';
-            document.getElementById('toggle-mobile').innerText = isCol ? 'Add New Task ▾' : 'Hide Form ▴';
+        async function updateJob() {
+            const d = document.getElementById('edit-date').value, t = document.getElementById('edit-time').value;
+            await sb.from('tasks').update({ name: document.getElementById('edit-name').value, due_timestamp: new Date(`${d}T${t}`).getTime() }).eq('id', activeJobId);
+            closeModal();
         }
 
+        async function deleteJob() { await sb.from('tasks').delete().eq('id', activeJobId); closeModal(); }
         function toggleEdit(e) { document.getElementById('view-mode').style.display = e ? 'none' : 'block'; document.getElementById('edit-mode').style.display = e ? 'flex' : 'none'; }
-        
-        function openSettings() {
-            document.getElementById('set-font').value = settings.fontSize;
-            document.getElementById('col-green').value = settings.colors.green;
-            document.getElementById('col-yellow').value = settings.colors.yellow;
-            document.getElementById('col-red').value = settings.colors.red;
-            document.getElementById('col-critical').value = settings.colors.critical;
-            document.getElementById('t-medium').value = settings.thresholds.medium;
-            document.getElementById('t-urgent').value = settings.thresholds.urgent;
-            document.getElementById('t-critical').value = settings.thresholds.critical;
-            document.getElementById('settings-modal').style.display = 'flex';
-        }
+        function openSettings() { document.getElementById('settings-modal').style.display = 'flex'; }
         function closeModal() { document.getElementById('details-modal').style.display = 'none'; }
         function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
         
-        if(window.innerWidth <= 768) document.getElementById('sidebar').classList.add('collapsed');
         init();
     </script>
 </body>
