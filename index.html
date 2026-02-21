@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Queue v1.1</title>
+    <title>Task Queue v1.2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -13,43 +13,41 @@
             --card-font-size: 1rem;
             --sidebar-width: 320px;
         }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-dark); color: #eee; margin: 0; display: flex; height: 100vh; overflow: hidden; transition: all 0.3s ease; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-dark); color: #eee; margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
-        /* PC Sidebar Logic */
+        /* PC Sidebar */
         #sidebar { 
             width: var(--sidebar-width); background: var(--sidebar-bg); padding: 25px; 
             display: flex; flex-direction: column; gap: 12px; z-index: 20; 
             box-shadow: 4px 0 15px rgba(0,0,0,0.5); overflow-y: auto;
-            transition: transform 0.3s ease, margin-left 0.3s ease;
-            position: relative;
+            transition: margin-left 0.3s ease; position: relative;
         }
         #sidebar.collapsed { margin-left: calc(var(--sidebar-width) * -1); }
 
-        /* Toggle Button PC */
         #toggle-pc {
-            position: fixed; left: 0; top: 50%; transform: translateY(-50%);
+            position: fixed; left: var(--sidebar-width); top: 50%; transform: translateY(-50%);
             background: var(--sidebar-bg); border: 1px solid #333; border-left: none;
             color: white; padding: 15px 8px; cursor: pointer; border-radius: 0 8px 8px 0;
-            z-index: 21; display: block;
+            z-index: 21; transition: left 0.3s ease;
         }
-        #sidebar:not(.collapsed) ~ #toggle-pc { left: var(--sidebar-width); }
+        .collapsed + #toggle-pc { left: 0; }
 
-        /* Main Content */
-        #main-display { flex-grow: 1; padding: 30px; overflow-y: auto; transition: padding 0.3s ease; }
+        /* Header / Search Area */
+        .top-bar { display: flex; align-items: center; gap: 15px; margin-bottom: 25px; }
+        #searchBar { flex-grow: 1; background: #2a2a2a; border: 1px solid #444; padding: 10px; border-radius: 6px; color: white; }
 
-        /* Mobile Specifics */
-        #toggle-mobile { display: none; width: 100%; background: #222; border: none; color: #aaa; padding: 10px; cursor: pointer; font-size: 1.2rem; }
+        #main-display { flex-grow: 1; padding: 30px; overflow-y: auto; }
+        #toggle-mobile { display: none; width: 100%; background: #222; border: none; color: #aaa; padding: 12px; cursor: pointer; font-size: 1.1rem; border-bottom: 1px solid #333; }
 
         @media (max-width: 768px) {
             body { flex-direction: column; overflow-y: auto; }
-            #sidebar { width: 100%; height: auto; transform: none; margin-left: 0; padding: 15px; border-bottom: 1px solid #333; }
+            #sidebar { width: 100%; height: auto; margin-left: 0; padding: 15px; display: block; }
             #sidebar.collapsed { display: none; }
             #toggle-pc { display: none; }
             #toggle-mobile { display: block; }
-            #main-display { padding: 15px; }
         }
 
-        /* Task Cards & Grid */
+        /* Cards */
         .queue-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
         .card { padding: 20px; border-radius: 12px; text-align: center; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.4); display: flex; flex-direction: column; justify-content: center; min-height: 180px; font-size: var(--card-font-size); }
         .card h3 { margin: 0; font-size: 2.2em; word-break: break-word; }
@@ -65,11 +63,9 @@
         input, textarea, button { padding: 12px; border-radius: 6px; border: 1px solid #333; background: #2a2a2a; color: white; font-size: 1rem; }
         button.primary { background: #3498db; border: none; font-weight: bold; cursor: pointer; }
         
+        /* Modals */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; justify-content: center; align-items: center; }
         .modal-content { background: #fff; color: #222; padding: 30px; border-radius: 15px; width: 90%; max-width: 450px; display: flex; flex-direction: column; gap: 15px; max-height: 90vh; overflow-y: auto; }
-        .btn-group { display: flex; gap: 10px; margin-top: 10px; }
-        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; }
-        .settings-grid label { color: #555; text-transform: none; margin: 0; }
     </style>
 </head>
 <body>
@@ -77,21 +73,23 @@
     <button id="toggle-mobile" onclick="toggleSidebar()">Add New Task ▾</button>
 
     <div id="sidebar">
-        <h2 style="display:flex; justify-content:space-between; align-items:center; margin:0">Task Queue 
-            <button onclick="openSettings()" style="background:none; border:none; cursor:pointer; font-size:1.5rem">⚙️</button>
-        </h2>
-        <label>Task</label><input type="text" id="custName">
+        <h2 style="margin:0 0 10px 0">New Task</h2>
+        <label>Task Name</label><input type="text" id="custName">
         <label>Subject</label><input type="text" id="jobSubject">
         <label>Due Date & Time</label>
         <div style="display:flex; gap:5px"><input type="date" id="dueDate" style="flex:2"><input type="time" id="dueTime" style="flex:1"></div>
         <label>Notes</label><textarea id="jobNotes" rows="4"></textarea>
-        <button class="primary" onclick="addJob()">Add Task</button>
-        <button onclick="toggleSidebar()" style="background:none; border:none; color:#555; cursor:pointer; text-decoration:underline">Collapse View</button>
+        <button class="primary" onclick="addJob()">Add to Queue</button>
+        <button onclick="toggleSidebar()" style="background:none; border:none; color:#555; cursor:pointer; text-decoration:underline; margin-top:10px">Collapse Sidebar</button>
     </div>
 
-    <button id="toggle-pc" onclick="toggleSidebar()">▶</button>
+    <button id="toggle-pc" onclick="toggleSidebar()">◀</button>
 
     <div id="main-display">
+        <div class="top-bar">
+            <input type="text" id="searchBar" placeholder="Search tasks or subjects..." oninput="renderQueue()">
+            <button onclick="openSettings()" style="background:none; border:none; cursor:pointer; font-size:1.5rem; padding:0">⚙️</button>
+        </div>
         <div id="queue-container" class="queue-grid"></div>
     </div>
 
@@ -100,17 +98,17 @@
             <h2 style="margin:0; color:#222">Global Settings</h2>
             <label style="color:#666">Card Font Size</label>
             <input type="range" id="set-font" min="0.5" max="2" step="0.1" oninput="settings.fontSize = this.value; applySettings();">
-            <div class="settings-grid">
-                <div><label>Normal</label><br><input type="color" id="col-green" style="width:100%"></div>
-                <div><label>Medium</label><br><input type="color" id="col-yellow" style="width:100%"></div>
-                <div><label>Urgent</label><br><input type="color" id="col-red" style="width:100%"></div>
-                <div><label>Critical</label><br><input type="color" id="col-critical" style="width:100%"></div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
+                <div><label style="color:#666">Normal</label><input type="color" id="col-green" style="width:100%"></div>
+                <div><label style="color:#666">Medium</label><input type="color" id="col-yellow" style="width:100%"></div>
+                <div><label style="color:#666">Urgent</label><input type="color" id="col-red" style="width:100%"></div>
+                <div><label style="color:#666">Critical</label><input type="color" id="col-critical" style="width:100%"></div>
             </div>
             <h3 style="margin:10px 0 0; color:#444">Thresholds (Mins)</h3>
-            <div class="settings-grid">
-                <label>Medium:</label><input type="number" id="t-medium" style="background:#eee; color:#222">
-                <label>Urgent:</label><input type="number" id="t-urgent" style="background:#eee; color:#222">
-                <label>Critical:</label><input type="number" id="t-critical" style="background:#eee; color:#222">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; align-items:center">
+                <label style="color:#555">Medium:</label><input type="number" id="t-medium" style="background:#eee; color:#222">
+                <label style="color:#555">Urgent:</label><input type="number" id="t-urgent" style="background:#eee; color:#222">
+                <label style="color:#555">Critical:</label><input type="number" id="t-critical" style="background:#eee; color:#222">
             </div>
             <button class="primary" onclick="saveSettings()">Save for All Devices</button>
         </div>
@@ -122,21 +120,20 @@
                 <h1 id="view-name" style="margin:0"></h1>
                 <h3 id="view-subject" style="color:#666; margin-top:5px"></h3>
                 <p id="view-notes" style="background:#f9f9f9; padding:15px; border-radius:8px; min-height:80px; white-space: pre-wrap; color:#333"></p>
-                <div class="btn-group">
-                    <button style="background:#f39c12; flex:1; border:none; color:white; font-weight:bold; cursor:pointer" onclick="toggleEdit(true)">Edit Task</button>
-                    <button style="background:#e74c3c; flex:1; border:none; color:white; font-weight:bold; cursor:pointer" onclick="deleteJob()">Complete</button>
+                <div style="display:flex; gap:10px">
+                    <button style="background:#f39c12; flex:1; border:none; color:white; font-weight:bold; cursor:pointer; padding:12px; border-radius:6px" onclick="toggleEdit(true)">Edit</button>
+                    <button style="background:#e74c3c; flex:1; border:none; color:white; font-weight:bold; cursor:pointer; padding:12px; border-radius:6px" onclick="deleteJob()">Complete</button>
                 </div>
             </div>
             <div id="edit-mode" style="display:none; flex-direction:column; gap:10px;">
                 <h2 style="margin:0; color:#222">Edit Task</h2>
-                <label style="color:#666">Name</label><input type="text" id="edit-name" style="background:#eee; color:#222">
-                <label style="color:#666">Subject</label><input type="text" id="edit-subject" style="background:#eee; color:#222">
-                <label style="color:#666">Due Date/Time</label>
+                <input type="text" id="edit-name" style="background:#eee; color:#222">
+                <input type="text" id="edit-subject" style="background:#eee; color:#222">
                 <div style="display:flex; gap:5px"><input type="date" id="edit-date" style="background:#eee; color:#222; flex:2"><input type="time" id="edit-time" style="background:#eee; color:#222; flex:1"></div>
-                <label style="color:#666">Notes</label><textarea id="edit-notes" rows="4" style="background:#eee; color:#222"></textarea>
-                <div class="btn-group">
-                    <button class="primary" style="flex:1" onclick="updateJob()">Save Changes</button>
-                    <button style="background:#7f8c8d; flex:1; border:none; color:white; font-weight:bold; cursor:pointer" onclick="toggleEdit(false)">Cancel</button>
+                <textarea id="edit-notes" rows="4" style="background:#eee; color:#222"></textarea>
+                <div style="display:flex; gap:10px">
+                    <button class="primary" style="flex:1" onclick="updateJob()">Save</button>
+                    <button style="background:#7f8c8d; flex:1; border:none; color:white; font-weight:bold; cursor:pointer; padding:12px; border-radius:6px" onclick="toggleEdit(false)">Cancel</button>
                 </div>
             </div>
             <button onclick="closeModal()" style="margin-top:10px; background:none; border:none; color:#999; cursor:pointer; text-decoration:underline">Close</button>
@@ -155,12 +152,9 @@
         function toggleSidebar() {
             const sbElem = document.getElementById('sidebar');
             const btn = document.getElementById('toggle-pc');
-            sbElem.classList.toggle('collapsed');
-            btn.innerText = sbElem.classList.contains('collapsed') ? '▶' : '◀';
-            
-            // Mobile button text toggle
-            const mobBtn = document.getElementById('toggle-mobile');
-            mobBtn.innerText = sbElem.classList.contains('collapsed') ? 'Add New Task ▾' : 'Hide Form ▴';
+            const isCol = sbElem.classList.toggle('collapsed');
+            btn.innerText = isCol ? '▶' : '◀';
+            document.getElementById('toggle-mobile').innerText = isCol ? 'Add New Task ▾' : 'Hide Form ▴';
         }
 
         async function init() {
@@ -200,17 +194,15 @@
         }
 
         async function addJob() {
-            const d = document.getElementById('dueDate').value;
-            const t = document.getElementById('dueTime').value;
+            const d = document.getElementById('dueDate').value, t = document.getElementById('dueTime').value;
             if(!d || !t) return alert("Date/Time required");
             await sb.from('tasks').insert([{ name: document.getElementById('custName').value, subject: document.getElementById('jobSubject').value, notes: document.getElementById('jobNotes').value, due_timestamp: new Date(`${d}T${t}`).getTime() }]);
             ['custName', 'jobSubject', 'jobNotes'].forEach(id => document.getElementById(id).value = '');
-            if(window.innerWidth <= 768) toggleSidebar(); // Auto-collapse on mobile after adding
+            if(window.innerWidth <= 768) toggleSidebar();
         }
 
         async function updateJob() {
-            const d = document.getElementById('edit-date').value;
-            const t = document.getElementById('edit-time').value;
+            const d = document.getElementById('edit-date').value, t = document.getElementById('edit-time').value;
             await sb.from('tasks').update({ name: document.getElementById('edit-name').value, subject: document.getElementById('edit-subject').value, notes: document.getElementById('edit-notes').value, due_timestamp: new Date(`${d}T${t}`).getTime() }).eq('id', activeJobId);
             closeModal();
         }
@@ -219,7 +211,12 @@
 
         function renderQueue() {
             const container = document.getElementById('queue-container');
-            const sorted = [...queue].sort((a, b) => a.due_timestamp - b.now()); // Note: corrected sorting
+            const query = document.getElementById('searchBar').value.toLowerCase();
+            
+            // FIXED SORTING HERE
+            const filtered = queue.filter(j => j.name.toLowerCase().includes(query) || j.subject.toLowerCase().includes(query));
+            const sorted = filtered.sort((a, b) => a.due_timestamp - b.due_timestamp);
+            
             container.innerHTML = ''; 
             sorted.forEach((job) => {
                 const diff = job.due_timestamp - Date.now();
@@ -248,7 +245,7 @@
             const job = queue.find(j => j.id === id);
             document.getElementById('view-name').innerText = job.name;
             document.getElementById('view-subject').innerText = job.subject;
-            document.getElementById('view-notes').innerText = job.notes || "No notes.";
+            document.getElementById('view-notes').innerText = job.notes || "";
             const dt = new Date(job.due_timestamp);
             document.getElementById('edit-name').value = job.name;
             document.getElementById('edit-subject').value = job.subject;
@@ -259,11 +256,7 @@
             document.getElementById('details-modal').style.display = "flex";
         }
 
-        function toggleEdit(isEdit) {
-            document.getElementById('view-mode').style.display = isEdit ? 'none' : 'block';
-            document.getElementById('edit-mode').style.display = isEdit ? 'flex' : 'none';
-        }
-
+        function toggleEdit(e) { document.getElementById('view-mode').style.display = e ? 'none' : 'block'; document.getElementById('edit-mode').style.display = e ? 'flex' : 'none'; }
         function openSettings() {
             document.getElementById('set-font').value = settings.fontSize;
             document.getElementById('col-green').value = settings.colors.green;
@@ -275,13 +268,10 @@
             document.getElementById('t-critical').value = settings.thresholds.critical;
             document.getElementById('settings-modal').style.display = 'flex';
         }
-
         function closeModal() { document.getElementById('details-modal').style.display = 'none'; }
         function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
         
-        // Start collapsed on small screens
         if(window.innerWidth <= 768) document.getElementById('sidebar').classList.add('collapsed');
-
         init();
     </script>
 </body>
