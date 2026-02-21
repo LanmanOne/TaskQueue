@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Queue v1.0</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg-dark: #121212; --sidebar-bg: #1e1e1e;
+            --card-green: #2ecc71; --card-yellow: #f1c40f;
+            --card-red: #e74c3c; --card-critical: #96281b;
+            --card-font-size: 1rem;
+        }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-dark); color: #eee; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        #sidebar { width: 320px; background: var(--sidebar-bg); padding: 25px; display: flex; flex-direction: column; gap: 12px; z-index: 10; box-shadow: 4px 0 15px rgba(0,0,0,0.5); overflow-y: auto; }
+        #main-display { flex-grow: 1; padding: 30px; overflow-y: auto; }
+
+        @media (max-width: 768px) {
+            body { flex-direction: column; height: auto; overflow-y: auto; }
+            #sidebar { width: 100%; box-sizing: border-box; }
+        }
+
+        .queue-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .card { padding: 20px; border-radius: 12px; text-align: center; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.4); display: flex; flex-direction: column; justify-content: center; min-height: 180px; font-size: var(--card-font-size); }
+        .card h3 { margin: 0; font-size: 2.2em; word-break: break-word; }
+        .timer { font-size: 2.2em; font-weight: 800; font-family: monospace; margin-top: 10px; }
+
+        .status-green { background: var(--card-green); color: white; }
+        .status-yellow { background: var(--card-yellow); color: #111; }
+        .status-red { background: var(--card-red); color: white; }
+        .status-critical { background: var(--card-critical); color: white; animation: flash 1s infinite; }
+        @keyframes flash { 0%, 100% { background: var(--card-critical); } 50% { background: #ff0000; } }
+
+        label { font-size: 0.75rem; color: #aaa; text-transform: uppercase; font-weight: bold; margin-bottom: -5px; }
+        input, textarea, button { padding: 12px; border-radius: 6px; border: 1px solid #333; background: #2a2a2a; color: white; font-size: 1rem; }
+        button.primary { background: #3498db; border: none; font-weight: bold; cursor: pointer; }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; justify-content: center; align-items: center; }
+        .modal-content { background: #fff; color: #222; padding: 30px; border-radius: 15px; width: 90%; max-width: 450px; display: flex; flex-direction: column; gap: 15px; max-height: 90vh; overflow-y: auto; }
+        .btn-group { display: flex; gap: 10px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <h2 style="display:flex; justify-content:space-between; align-items:center; margin:0">Task Queue v1.0 
+            <button onclick="openSettings()" style="background:none; border:none; cursor:pointer; font-size:1.5rem">⚙️</button>
+        </h2>
+        <label>Task</label><input type="text" id="custName">
+        <label>Subject</label><input type="text" id="jobSubject">
+        <label>Due Date & Time</label>
+        <div style="display:flex; gap:5px"><input type="date" id="dueDate" style="flex:2"><input type="time" id="dueTime" style="flex:1"></div>
+        <label>Notes</label><textarea id="jobNotes" rows="4"></textarea>
+        <button class="primary" onclick="addJob()">Add Task</button>
+    </div>
+
+    <div id="main-display"><div id="queue-container" class="queue-grid"></div></div>
+
+    <div id="settings-modal" class="modal" onclick="closeSettings()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h2 style="margin:0; color:#222">Global Settings</h2>
+            <label style="color:#666">Card Font Size</label>
+            <input type="range" id="set-font" min="0.5" max="2" step="0.1" oninput="settings.fontSize = this.value; applySettings();">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div><label style="color:#666">Normal</label><br><input type="color" id="col-green" style="width:100%"></div>
+                <div><label style="color:#666">Medium</label><br><input type="color" id="col-yellow" style="width:100%"></div>
+                <div><label style="color:#666">Urgent</label><br><input type="color" id="col-red" style="width:100%"></div>
+                <div><label style="color:#666">Critical</label><br><input type="color" id="col-critical" style="width:100%"></div>
+            </div>
+            <button class="primary" onclick="saveSettings()">Save for All Devices</button>
+        </div>
+    </div>
+
+    <div id="details-modal" class="modal" onclick="closeModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            
+            <div id="view-mode">
+                <h1 id="view-name" style="margin:0"></h1>
+                <h3 id="view-subject" style="color:#666; margin-top:5px"></h3>
+                <p id="view-notes" style="background:#f9f9f9; padding:15px; border-radius:8px; min-height:80px; white-space: pre-wrap; color:#333"></p>
+                <div class="btn-group">
+                    <button style="background:#f39c12; flex:1; border:none; color:white; font-weight:bold; cursor:pointer" onclick="toggleEdit(true)">Edit Task</button>
+                    <button style="background:#e74c3c; flex:1; border:none; color:white; font-weight:bold; cursor:pointer" onclick="deleteJob()">Complete</button>
+                </div>
+            </div>
+
+            <div id="edit-mode" style="display:none; flex-direction:column; gap:10px;">
+                <h2 style="margin:0; color:#222">Edit Task</h2>
+                <label style="color:#666">Name</label><input type="text" id="edit-name" style="background:#eee; color:#222">
+                <label style="color:#666">Subject</label><input type="text" id="edit-subject" style="background:#eee; color:#222">
+                <label style="color:#666">Due Date/Time</label>
+                <div style="display:flex; gap:5px"><input type="date" id="edit-date" style="background:#eee; color:#222; flex:2"><input type="time" id="edit-time" style="background:#eee; color:#222; flex:1"></div>
+                <label style="color:#666">Notes</label><textarea id="edit-notes" rows="4" style="background:#eee; color:#222"></textarea>
+                <div class="btn-group">
+                    <button class="primary" style="flex:1" onclick="updateJob()">Save Changes</button>
+                    <button style="background:#7f8c8d; flex:1; border:none; color:white; font-weight:bold; cursor:pointer" onclick="toggleEdit(false)">Cancel</button>
+                </div>
+            </div>
+
+            <button onclick="closeModal()" style="margin-top:10px; background:none; border:none; color:#999; cursor:pointer; text-decoration:underline">Close</button>
+        </div>
+    </div>
+
+    <script>
+		const SUPABASE_URL = 'https://hnznwbklfoiolptvvypf.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhuem53YmtsZm9pb2xwdHZ2eXBmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3ODQzNzUsImV4cCI6MjA4NDM2MDM3NX0.dsgpuQB71AkcHKKBTzcYiwxcVLZWdEVd9vcpkVEtWME';
+        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let queue = [];
+        let activeJobId = null;
+        let settings = { fontSize: 1, colors: {}, thresholds: {} };
+
+        async function init() {
+            await fetchSettings();
+            await fetchTasks();
+            sb.channel('sync').on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, fetchTasks).on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, fetchSettings).subscribe();
+            setInterval(renderQueue, 1000);
+            document.getElementById('dueDate').valueAsDate = new Date();
+        }
+
+        async function fetchSettings() {
+            const { data } = await sb.from('settings').select('data').eq('id', 1).single();
+            if (data) { settings = data.data; applySettings(); }
+        }
+
+        async function saveSettings() {
+            settings.colors = { green: document.getElementById('col-green').value, yellow: document.getElementById('col-yellow').value, red: document.getElementById('col-red').value, critical: document.getElementById('col-critical').value };
+            await sb.from('settings').update({ data: settings }).eq('id', 1);
+            closeSettings();
+        }
+
+        function applySettings() {
+            const root = document.documentElement;
+            root.style.setProperty('--card-font-size', settings.fontSize + 'rem');
+            root.style.setProperty('--card-green', settings.colors.green);
+            root.style.setProperty('--card-yellow', settings.colors.yellow);
+            root.style.setProperty('--card-red', settings.colors.red);
+            root.style.setProperty('--card-critical', settings.colors.critical);
+        }
+
+        async function fetchTasks() {
+            const { data } = await sb.from('tasks').select('*');
+            queue = data || [];
+            renderQueue();
+        }
+
+        async function addJob() {
+            const d = document.getElementById('dueDate').value;
+            const t = document.getElementById('dueTime').value;
+            await sb.from('tasks').insert([{ name: document.getElementById('custName').value, subject: document.getElementById('jobSubject').value, notes: document.getElementById('jobNotes').value, due_timestamp: new Date(`${d}T${t}`).getTime() }]);
+            ['custName', 'jobSubject', 'jobNotes'].forEach(id => document.getElementById(id).value = '');
+        }
+
+        async function updateJob() {
+            const d = document.getElementById('edit-date').value;
+            const t = document.getElementById('edit-time').value;
+            await sb.from('tasks').update({
+                name: document.getElementById('edit-name').value,
+                subject: document.getElementById('edit-subject').value,
+                notes: document.getElementById('edit-notes').value,
+                due_timestamp: new Date(`${d}T${t}`).getTime()
+            }).eq('id', activeJobId);
+            closeModal();
+        }
+
+        async function deleteJob() { await sb.from('tasks').delete().eq('id', activeJobId); closeModal(); }
+
+        function renderQueue() {
+            const container = document.getElementById('queue-container');
+            const sorted = [...queue].sort((a, b) => a.due_timestamp - b.due_timestamp);
+            container.innerHTML = ''; 
+            sorted.forEach((job) => {
+                const diff = job.due_timestamp - Date.now();
+                const mins = diff / 60000;
+                let s = "status-green";
+                if(mins < settings.thresholds.critical) s = "status-critical";
+                else if(mins < settings.thresholds.urgent) s = "status-red";
+                else if(mins < settings.thresholds.medium) s = "status-yellow";
+                const card = document.createElement('div');
+                card.className = `card ${s}`;
+                card.onclick = () => openModal(job.id);
+                card.innerHTML = `<h3>${job.name}</h3><p>${job.subject}</p><div class="timer">${formatCountdown(diff)}</div>`;
+                container.appendChild(card);
+            });
+        }
+
+        function formatCountdown(ms) {
+            const abs = Math.abs(ms);
+            const d = Math.floor(abs / 86400000), h = Math.floor((abs % 86400000) / 3600000), m = Math.floor((abs % 3600000) / 60000), s = Math.floor((abs % 60000) / 1000);
+            let p = []; if(d > 0) p.push(`${d}D`); if(h > 0 || d > 0) p.push(`${h}H`); p.push(`${m}M`, `${s}S`);
+            return (ms < 0 ? '- ' : '') + p.join(' ');
+        }
+
+        function openModal(id) {
+            activeJobId = id;
+            const job = queue.find(j => j.id === id);
+            document.getElementById('view-name').innerText = job.name;
+            document.getElementById('view-subject').innerText = job.subject;
+            document.getElementById('view-notes').innerText = job.notes || "No notes.";
+            
+            const dt = new Date(job.due_timestamp);
+            document.getElementById('edit-name').value = job.name;
+            document.getElementById('edit-subject').value = job.subject;
+            document.getElementById('edit-notes').value = job.notes;
+            document.getElementById('edit-date').value = dt.toISOString().split('T')[0];
+            document.getElementById('edit-time').value = dt.toTimeString().slice(0,5);
+            
+            toggleEdit(false);
+            document.getElementById('details-modal').style.display = "flex";
+        }
+
+        function toggleEdit(isEdit) {
+            document.getElementById('view-mode').style.display = isEdit ? 'none' : 'block';
+            document.getElementById('edit-mode').style.display = isEdit ? 'flex' : 'none';
+        }
+
+        function openSettings() {
+            document.getElementById('set-font').value = settings.fontSize;
+            document.getElementById('col-green').value = settings.colors.green;
+            document.getElementById('col-yellow').value = settings.colors.yellow;
+            document.getElementById('col-red').value = settings.colors.red;
+            document.getElementById('col-critical').value = settings.colors.critical;
+            document.getElementById('settings-modal').style.display = 'flex';
+        }
+
+        function closeModal() { document.getElementById('details-modal').style.display = 'none'; }
+        function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
+        init();
+    </script>
+</body>
+</html>
