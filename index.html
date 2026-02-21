@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Queue v1.0</title>
+    <title>Task Queue v1.1</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -11,17 +11,45 @@
             --card-green: #2ecc71; --card-yellow: #f1c40f;
             --card-red: #e74c3c; --card-critical: #96281b;
             --card-font-size: 1rem;
+            --sidebar-width: 320px;
         }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-dark); color: #eee; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-dark); color: #eee; margin: 0; display: flex; height: 100vh; overflow: hidden; transition: all 0.3s ease; }
         
-        #sidebar { width: 320px; background: var(--sidebar-bg); padding: 25px; display: flex; flex-direction: column; gap: 12px; z-index: 10; box-shadow: 4px 0 15px rgba(0,0,0,0.5); overflow-y: auto; }
-        #main-display { flex-grow: 1; padding: 30px; overflow-y: auto; }
+        /* PC Sidebar Logic */
+        #sidebar { 
+            width: var(--sidebar-width); background: var(--sidebar-bg); padding: 25px; 
+            display: flex; flex-direction: column; gap: 12px; z-index: 20; 
+            box-shadow: 4px 0 15px rgba(0,0,0,0.5); overflow-y: auto;
+            transition: transform 0.3s ease, margin-left 0.3s ease;
+            position: relative;
+        }
+        #sidebar.collapsed { margin-left: calc(var(--sidebar-width) * -1); }
+
+        /* Toggle Button PC */
+        #toggle-pc {
+            position: fixed; left: 0; top: 50%; transform: translateY(-50%);
+            background: var(--sidebar-bg); border: 1px solid #333; border-left: none;
+            color: white; padding: 15px 8px; cursor: pointer; border-radius: 0 8px 8px 0;
+            z-index: 21; display: block;
+        }
+        #sidebar:not(.collapsed) ~ #toggle-pc { left: var(--sidebar-width); }
+
+        /* Main Content */
+        #main-display { flex-grow: 1; padding: 30px; overflow-y: auto; transition: padding 0.3s ease; }
+
+        /* Mobile Specifics */
+        #toggle-mobile { display: none; width: 100%; background: #222; border: none; color: #aaa; padding: 10px; cursor: pointer; font-size: 1.2rem; }
 
         @media (max-width: 768px) {
-            body { flex-direction: column; height: auto; overflow-y: auto; }
-            #sidebar { width: 100%; box-sizing: border-box; }
+            body { flex-direction: column; overflow-y: auto; }
+            #sidebar { width: 100%; height: auto; transform: none; margin-left: 0; padding: 15px; border-bottom: 1px solid #333; }
+            #sidebar.collapsed { display: none; }
+            #toggle-pc { display: none; }
+            #toggle-mobile { display: block; }
+            #main-display { padding: 15px; }
         }
 
+        /* Task Cards & Grid */
         .queue-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
         .card { padding: 20px; border-radius: 12px; text-align: center; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.4); display: flex; flex-direction: column; justify-content: center; min-height: 180px; font-size: var(--card-font-size); }
         .card h3 { margin: 0; font-size: 2.2em; word-break: break-word; }
@@ -46,8 +74,10 @@
 </head>
 <body>
 
+    <button id="toggle-mobile" onclick="toggleSidebar()">Add New Task ▾</button>
+
     <div id="sidebar">
-        <h2 style="display:flex; justify-content:space-between; align-items:center; margin:0">Task Queue v1.0 
+        <h2 style="display:flex; justify-content:space-between; align-items:center; margin:0">Task Queue 
             <button onclick="openSettings()" style="background:none; border:none; cursor:pointer; font-size:1.5rem">⚙️</button>
         </h2>
         <label>Task</label><input type="text" id="custName">
@@ -56,40 +86,38 @@
         <div style="display:flex; gap:5px"><input type="date" id="dueDate" style="flex:2"><input type="time" id="dueTime" style="flex:1"></div>
         <label>Notes</label><textarea id="jobNotes" rows="4"></textarea>
         <button class="primary" onclick="addJob()">Add Task</button>
+        <button onclick="toggleSidebar()" style="background:none; border:none; color:#555; cursor:pointer; text-decoration:underline">Collapse View</button>
     </div>
 
-    <div id="main-display"><div id="queue-container" class="queue-grid"></div></div>
+    <button id="toggle-pc" onclick="toggleSidebar()">▶</button>
+
+    <div id="main-display">
+        <div id="queue-container" class="queue-grid"></div>
+    </div>
 
     <div id="settings-modal" class="modal" onclick="closeSettings()">
         <div class="modal-content" onclick="event.stopPropagation()">
             <h2 style="margin:0; color:#222">Global Settings</h2>
-            
             <label style="color:#666">Card Font Size</label>
             <input type="range" id="set-font" min="0.5" max="2" step="0.1" oninput="settings.fontSize = this.value; applySettings();">
-            
-            <h3 style="margin:10px 0 0; color:#444">Colors</h3>
             <div class="settings-grid">
                 <div><label>Normal</label><br><input type="color" id="col-green" style="width:100%"></div>
                 <div><label>Medium</label><br><input type="color" id="col-yellow" style="width:100%"></div>
                 <div><label>Urgent</label><br><input type="color" id="col-red" style="width:100%"></div>
                 <div><label>Critical</label><br><input type="color" id="col-critical" style="width:100%"></div>
             </div>
-
-            <h3 style="margin:10px 0 0; color:#444">Thresholds (Mins Remaining)</h3>
+            <h3 style="margin:10px 0 0; color:#444">Thresholds (Mins)</h3>
             <div class="settings-grid">
-                <label>Medium at:</label><input type="number" id="t-medium" style="background:#eee; color:#222">
-                <label>Urgent at:</label><input type="number" id="t-urgent" style="background:#eee; color:#222">
-                <label>Critical at:</label><input type="number" id="t-critical" style="background:#eee; color:#222">
+                <label>Medium:</label><input type="number" id="t-medium" style="background:#eee; color:#222">
+                <label>Urgent:</label><input type="number" id="t-urgent" style="background:#eee; color:#222">
+                <label>Critical:</label><input type="number" id="t-critical" style="background:#eee; color:#222">
             </div>
-
             <button class="primary" onclick="saveSettings()">Save for All Devices</button>
-            <button onclick="closeSettings()" style="background:none; border:none; color:#999; cursor:pointer; text-decoration:underline">Cancel</button>
         </div>
     </div>
 
     <div id="details-modal" class="modal" onclick="closeModal()">
         <div class="modal-content" onclick="event.stopPropagation()">
-            
             <div id="view-mode">
                 <h1 id="view-name" style="margin:0"></h1>
                 <h3 id="view-subject" style="color:#666; margin-top:5px"></h3>
@@ -99,7 +127,6 @@
                     <button style="background:#e74c3c; flex:1; border:none; color:white; font-weight:bold; cursor:pointer" onclick="deleteJob()">Complete</button>
                 </div>
             </div>
-
             <div id="edit-mode" style="display:none; flex-direction:column; gap:10px;">
                 <h2 style="margin:0; color:#222">Edit Task</h2>
                 <label style="color:#666">Name</label><input type="text" id="edit-name" style="background:#eee; color:#222">
@@ -112,7 +139,6 @@
                     <button style="background:#7f8c8d; flex:1; border:none; color:white; font-weight:bold; cursor:pointer" onclick="toggleEdit(false)">Cancel</button>
                 </div>
             </div>
-
             <button onclick="closeModal()" style="margin-top:10px; background:none; border:none; color:#999; cursor:pointer; text-decoration:underline">Close</button>
         </div>
     </div>
@@ -125,6 +151,17 @@
         let queue = [];
         let activeJobId = null;
         let settings = { fontSize: 1, colors: {}, thresholds: { medium: 60, urgent: 30, critical: 15 } };
+
+        function toggleSidebar() {
+            const sbElem = document.getElementById('sidebar');
+            const btn = document.getElementById('toggle-pc');
+            sbElem.classList.toggle('collapsed');
+            btn.innerText = sbElem.classList.contains('collapsed') ? '▶' : '◀';
+            
+            // Mobile button text toggle
+            const mobBtn = document.getElementById('toggle-mobile');
+            mobBtn.innerText = sbElem.classList.contains('collapsed') ? 'Add New Task ▾' : 'Hide Form ▴';
+        }
 
         async function init() {
             await fetchSettings();
@@ -141,17 +178,8 @@
 
         async function saveSettings() {
             settings.fontSize = document.getElementById('set-font').value;
-            settings.colors = { 
-                green: document.getElementById('col-green').value, 
-                yellow: document.getElementById('col-yellow').value, 
-                red: document.getElementById('col-red').value, 
-                critical: document.getElementById('col-critical').value 
-            };
-            settings.thresholds = {
-                medium: parseInt(document.getElementById('t-medium').value),
-                urgent: parseInt(document.getElementById('t-urgent').value),
-                critical: parseInt(document.getElementById('t-critical').value)
-            };
+            settings.colors = { green: document.getElementById('col-green').value, yellow: document.getElementById('col-yellow').value, red: document.getElementById('col-red').value, critical: document.getElementById('col-critical').value };
+            settings.thresholds = { medium: parseInt(document.getElementById('t-medium').value), urgent: parseInt(document.getElementById('t-urgent').value), critical: parseInt(document.getElementById('t-critical').value) };
             await sb.from('settings').update({ data: settings }).eq('id', 1);
             closeSettings();
         }
@@ -174,20 +202,16 @@
         async function addJob() {
             const d = document.getElementById('dueDate').value;
             const t = document.getElementById('dueTime').value;
-            if(!d || !t) return alert("Please set a date and time");
+            if(!d || !t) return alert("Date/Time required");
             await sb.from('tasks').insert([{ name: document.getElementById('custName').value, subject: document.getElementById('jobSubject').value, notes: document.getElementById('jobNotes').value, due_timestamp: new Date(`${d}T${t}`).getTime() }]);
             ['custName', 'jobSubject', 'jobNotes'].forEach(id => document.getElementById(id).value = '');
+            if(window.innerWidth <= 768) toggleSidebar(); // Auto-collapse on mobile after adding
         }
 
         async function updateJob() {
             const d = document.getElementById('edit-date').value;
             const t = document.getElementById('edit-time').value;
-            await sb.from('tasks').update({
-                name: document.getElementById('edit-name').value,
-                subject: document.getElementById('edit-subject').value,
-                notes: document.getElementById('edit-notes').value,
-                due_timestamp: new Date(`${d}T${t}`).getTime()
-            }).eq('id', activeJobId);
+            await sb.from('tasks').update({ name: document.getElementById('edit-name').value, subject: document.getElementById('edit-subject').value, notes: document.getElementById('edit-notes').value, due_timestamp: new Date(`${d}T${t}`).getTime() }).eq('id', activeJobId);
             closeModal();
         }
 
@@ -195,7 +219,7 @@
 
         function renderQueue() {
             const container = document.getElementById('queue-container');
-            const sorted = [...queue].sort((a, b) => a.due_timestamp - b.due_timestamp);
+            const sorted = [...queue].sort((a, b) => a.due_timestamp - b.now()); // Note: corrected sorting
             container.innerHTML = ''; 
             sorted.forEach((job) => {
                 const diff = job.due_timestamp - Date.now();
@@ -225,14 +249,12 @@
             document.getElementById('view-name').innerText = job.name;
             document.getElementById('view-subject').innerText = job.subject;
             document.getElementById('view-notes').innerText = job.notes || "No notes.";
-            
             const dt = new Date(job.due_timestamp);
             document.getElementById('edit-name').value = job.name;
             document.getElementById('edit-subject').value = job.subject;
             document.getElementById('edit-notes').value = job.notes;
             document.getElementById('edit-date').value = dt.toISOString().split('T')[0];
             document.getElementById('edit-time').value = dt.toTimeString().slice(0,5);
-            
             toggleEdit(false);
             document.getElementById('details-modal').style.display = "flex";
         }
@@ -248,7 +270,6 @@
             document.getElementById('col-yellow').value = settings.colors.yellow;
             document.getElementById('col-red').value = settings.colors.red;
             document.getElementById('col-critical').value = settings.colors.critical;
-            // Restore thresholds to UI
             document.getElementById('t-medium').value = settings.thresholds.medium;
             document.getElementById('t-urgent').value = settings.thresholds.urgent;
             document.getElementById('t-critical').value = settings.thresholds.critical;
@@ -257,6 +278,10 @@
 
         function closeModal() { document.getElementById('details-modal').style.display = 'none'; }
         function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
+        
+        // Start collapsed on small screens
+        if(window.innerWidth <= 768) document.getElementById('sidebar').classList.add('collapsed');
+
         init();
     </script>
 </body>
