@@ -40,6 +40,8 @@
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; justify-content: center; align-items: center; }
         .modal-content { background: #fff; color: #222; padding: 30px; border-radius: 15px; width: 90%; max-width: 450px; display: flex; flex-direction: column; gap: 15px; max-height: 90vh; overflow-y: auto; }
         .btn-group { display: flex; gap: 10px; margin-top: 10px; }
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; }
+        .settings-grid label { color: #555; text-transform: none; margin: 0; }
     </style>
 </head>
 <body>
@@ -61,15 +63,27 @@
     <div id="settings-modal" class="modal" onclick="closeSettings()">
         <div class="modal-content" onclick="event.stopPropagation()">
             <h2 style="margin:0; color:#222">Global Settings</h2>
+            
             <label style="color:#666">Card Font Size</label>
             <input type="range" id="set-font" min="0.5" max="2" step="0.1" oninput="settings.fontSize = this.value; applySettings();">
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div><label style="color:#666">Normal</label><br><input type="color" id="col-green" style="width:100%"></div>
-                <div><label style="color:#666">Medium</label><br><input type="color" id="col-yellow" style="width:100%"></div>
-                <div><label style="color:#666">Urgent</label><br><input type="color" id="col-red" style="width:100%"></div>
-                <div><label style="color:#666">Critical</label><br><input type="color" id="col-critical" style="width:100%"></div>
+            
+            <h3 style="margin:10px 0 0; color:#444">Colors</h3>
+            <div class="settings-grid">
+                <div><label>Normal</label><br><input type="color" id="col-green" style="width:100%"></div>
+                <div><label>Medium</label><br><input type="color" id="col-yellow" style="width:100%"></div>
+                <div><label>Urgent</label><br><input type="color" id="col-red" style="width:100%"></div>
+                <div><label>Critical</label><br><input type="color" id="col-critical" style="width:100%"></div>
             </div>
+
+            <h3 style="margin:10px 0 0; color:#444">Thresholds (Mins Remaining)</h3>
+            <div class="settings-grid">
+                <label>Medium at:</label><input type="number" id="t-medium" style="background:#eee; color:#222">
+                <label>Urgent at:</label><input type="number" id="t-urgent" style="background:#eee; color:#222">
+                <label>Critical at:</label><input type="number" id="t-critical" style="background:#eee; color:#222">
+            </div>
+
             <button class="primary" onclick="saveSettings()">Save for All Devices</button>
+            <button onclick="closeSettings()" style="background:none; border:none; color:#999; cursor:pointer; text-decoration:underline">Cancel</button>
         </div>
     </div>
 
@@ -104,13 +118,13 @@
     </div>
 
     <script>
-		const SUPABASE_URL = 'https://hnznwbklfoiolptvvypf.supabase.co';
+        const SUPABASE_URL = 'https://hnznwbklfoiolptvvypf.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhuem53YmtsZm9pb2xwdHZ2eXBmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3ODQzNzUsImV4cCI6MjA4NDM2MDM3NX0.dsgpuQB71AkcHKKBTzcYiwxcVLZWdEVd9vcpkVEtWME';
         const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let queue = [];
         let activeJobId = null;
-        let settings = { fontSize: 1, colors: {}, thresholds: {} };
+        let settings = { fontSize: 1, colors: {}, thresholds: { medium: 60, urgent: 30, critical: 15 } };
 
         async function init() {
             await fetchSettings();
@@ -126,7 +140,18 @@
         }
 
         async function saveSettings() {
-            settings.colors = { green: document.getElementById('col-green').value, yellow: document.getElementById('col-yellow').value, red: document.getElementById('col-red').value, critical: document.getElementById('col-critical').value };
+            settings.fontSize = document.getElementById('set-font').value;
+            settings.colors = { 
+                green: document.getElementById('col-green').value, 
+                yellow: document.getElementById('col-yellow').value, 
+                red: document.getElementById('col-red').value, 
+                critical: document.getElementById('col-critical').value 
+            };
+            settings.thresholds = {
+                medium: parseInt(document.getElementById('t-medium').value),
+                urgent: parseInt(document.getElementById('t-urgent').value),
+                critical: parseInt(document.getElementById('t-critical').value)
+            };
             await sb.from('settings').update({ data: settings }).eq('id', 1);
             closeSettings();
         }
@@ -149,6 +174,7 @@
         async function addJob() {
             const d = document.getElementById('dueDate').value;
             const t = document.getElementById('dueTime').value;
+            if(!d || !t) return alert("Please set a date and time");
             await sb.from('tasks').insert([{ name: document.getElementById('custName').value, subject: document.getElementById('jobSubject').value, notes: document.getElementById('jobNotes').value, due_timestamp: new Date(`${d}T${t}`).getTime() }]);
             ['custName', 'jobSubject', 'jobNotes'].forEach(id => document.getElementById(id).value = '');
         }
@@ -222,6 +248,10 @@
             document.getElementById('col-yellow').value = settings.colors.yellow;
             document.getElementById('col-red').value = settings.colors.red;
             document.getElementById('col-critical').value = settings.colors.critical;
+            // Restore thresholds to UI
+            document.getElementById('t-medium').value = settings.thresholds.medium;
+            document.getElementById('t-urgent').value = settings.thresholds.urgent;
+            document.getElementById('t-critical').value = settings.thresholds.critical;
             document.getElementById('settings-modal').style.display = 'flex';
         }
 
